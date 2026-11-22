@@ -169,6 +169,37 @@ function App(): React.JSX.Element {
     })
   }, [activeSource, currentPage, screenBlank, hideCursor, laserPointerEnabled, transition])
 
+  // Independent confidence monitor. Only one PDF copy is sent: the Presenter
+  // renderer creates Now/Next from the same document, alongside current notes.
+  // Do not tie this state to whether the physical Presenter window is open.
+  useEffect(() => {
+    if (!activeSource || totalPages < 1) return
+    try {
+      const current = activeSource.getProgramOutPayload(currentPage)
+      const supportsFuture =
+        activeSource.kind !== 'google-slides' && activeSource.kind !== 'canva'
+      const nextAvailable = supportsFuture && currentPage < totalPages
+      const next = nextAvailable ? activeSource.getProgramOutPayload(currentPage + 1) : null
+      window.api.presenterOut.pushState({
+        source: current.kind === 'pdf'
+          ? { kind: 'pdf', data: current.data }
+          : {
+              kind: 'image',
+              currentUrl: current.fileUrl,
+              nextUrl: next?.kind === 'image' ? next.fileUrl : null
+            },
+        currentPage,
+        totalPages,
+        notes: notesBySlide[currentPage] ?? '',
+        fileName: filePath?.split(/[\\/]/).pop() ?? 'Prezentacja',
+        programBlank: screenBlank,
+        nextAvailable
+      }).catch((err) => console.error('Failed to update Presenter output:', err))
+    } catch (err) {
+      console.error('Failed to prepare Presenter output:', err)
+    }
+  }, [activeSource, currentPage, totalPages, notesBySlide, filePath, screenBlank])
+
   // A dedicated physical Next output is independent of Program Out and NDI.
   // Browser-bridged sources cannot provide future frames; show black instead of
   // presenting the current slide as if it were the next one.
@@ -772,6 +803,12 @@ function App(): React.JSX.Element {
           />
           <ProgramOutControl
             variant="next"
+            disabled={!activeSource || !totalPages}
+            hideCursor={hideCursor}
+            onHideCursorChange={setHideCursor}
+          />
+          <ProgramOutControl
+            variant="presenter"
             disabled={!activeSource || !totalPages}
             hideCursor={hideCursor}
             onHideCursorChange={setHideCursor}
