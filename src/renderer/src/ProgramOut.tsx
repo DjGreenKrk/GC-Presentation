@@ -6,7 +6,7 @@ import './App.css'
 import { loadPdf, renderPageContain } from './pdf'
 import { transitionToSlide } from './transitions'
 
-function ProgramOut(): React.JSX.Element {
+function ProgramOut({ mode = 'program' }: { mode?: 'program' | 'next' }): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
@@ -19,7 +19,8 @@ function ProgramOut(): React.JSX.Element {
   const deckChangedRef = useRef(true)
 
   useEffect(() => {
-    return window.api.programOut.onState((next) => {
+    const api = mode === 'next' ? window.api.nextOut : window.api.programOut
+    return api.onState((next) => {
       setState(next)
       if (next.kind === 'pdf' && next.data !== lastPdfDataRef.current) {
         lastPdfDataRef.current = next.data
@@ -27,11 +28,12 @@ function ProgramOut(): React.JSX.Element {
         loadPdf(next.data).then(setDoc)
       }
     })
-  }, [])
+  }, [mode])
 
   useEffect(() => {
+    if (mode === 'next') return
     return window.api.programOut.onLaserPosition(setLaserPosition)
-  }, [])
+  }, [mode])
 
   // What's currently drawn, so a state push that changed something unrelated
   // (a laser toggle, or the transition settings themselves) doesn't re-render
@@ -114,7 +116,7 @@ function ProgramOut(): React.JSX.Element {
           )}
         </div>
       ) : (
-        <div className="program-out-empty">No Program</div>
+        <div className="program-out-empty">{mode === 'next' ? 'No Next Slide' : 'No Program'}</div>
       )}
     </div>
   )
