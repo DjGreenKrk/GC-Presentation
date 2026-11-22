@@ -212,6 +212,11 @@ function createWindow(): void {
 }
 
 type PhysicalOutput = 'program' | 'next' | 'presenter'
+const assignedDisplays: Record<PhysicalOutput, number | null> = {
+  program: null,
+  next: null,
+  presenter: null
+}
 
 function getOutputWindow(kind: PhysicalOutput): BrowserWindow | null {
   if (kind === 'program') return programOutWindow
@@ -228,12 +233,13 @@ function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
   const primary = screen.getPrimaryDisplay()
   const chosen = displayId === undefined ? undefined : displays.find((d) => d.id === displayId)
   if (displayId !== undefined && !chosen) throw new Error('Wybrany monitor nie jest podłączony')
+  // Track assigned IDs rather than window bounds: Windows may move a
+  // fullscreen window to the primary display after its monitor disconnects.
   const occupied = new Set(
     (['program', 'next', 'presenter'] as const)
       .filter((name) => name !== kind)
-      .map(getOutputWindow)
-      .filter((win): win is BrowserWindow => Boolean(win && !win.isDestroyed()))
-      .map((win) => screen.getDisplayMatching(win.getBounds()).id)
+      .map((name) => assignedDisplays[name])
+      .filter((id): id is number => id !== null)
   )
   const target = chosen ?? displays.find((d) => d.id !== primary.id && !occupied.has(d.id)) ?? displays.find((d) => !occupied.has(d.id))
   if (!target) throw new Error('Brak wolnego monitora dla tego wyjścia')
@@ -265,6 +271,7 @@ function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
     })
   }
   win.on('closed', () => {
+    assignedDisplays[kind] = null
     if (kind === 'program') programOutWindow = null
     else if (kind === 'next') nextOutWindow = null
     else presenterOutWindow = null
@@ -280,6 +287,7 @@ function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
   if (kind === 'program') programOutWindow = win
   else if (kind === 'next') nextOutWindow = win
   else presenterOutWindow = win
+  assignedDisplays[kind] = target.id
   owner.webContents.send(`${prefix}:open-changed`, true)
 }
 
@@ -511,19 +519,26 @@ app.whenReady().then(() => {
     }
   })
 
-  screen.on('display-added', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('program-out:displays-changed', listDisplays())
-      mainWindow.webContents.send('next-out:displays-changed', listDisplays())
-      mainWindow.webContents.send('presenter-out:displays-changed', listDisplays())
+  const refreshPhysicalOutputs = (): void => {
+    const ids = new Set(screen.getAllDisplays().map((display) => display.id))
+    for (const kind of ['program', 'next', 'presenter'] as const) {
+      const assigned = assignedDisplays[kind]
+      if (assigned !== null && !ids.has(assigned)) {
+        // Do not allow an OS-migrated Preview to cover live Program.
+        say.warn(`[${kind}-out] Display ${assigned} disconnected; closing fullscreen output`)
+        getOutputWindow(kind)?.close()
+      }
     }
-  })
-  screen.on('display-removed', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('program-out:displays-changed', listDisplays())
-      mainWindow.webContents.send('next-out:displays-changed', listDisplays())
+      const displays = listDisplays()
+      for (const prefix of ['program-out', 'next-out', 'presenter-out']) {
+        mainWindow.webContents.send(`${prefix}:displays-changed`, displays)
+      }
     }
-  })
+  }
+  screen.on('display-added', refreshPhysicalOutputs)
+  screen.on('display-removed', refreshPhysicalOutputs)
+  screen.on('display-metrics-changed', refreshPhysicalOutputs)
 
   ipcMain.handle('ndi:toggle', (_e, streamId: string, name: string) => {
     if (ndiSenderService.isActive(streamId)) {
