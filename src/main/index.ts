@@ -22,6 +22,8 @@ import type { ProgramOutState, LaserPosition } from '../shared/programOut'
 import type { OscArg, OscConfig } from '../shared/osc'
 import { collectDiagnostics, init as initDiag, say } from './diag/index.js'
 import { installElectronDiagnostics } from './diag/electron.js'
+import { rawInputExecutablePath } from './services/rawInputHelper'
+import { HidDiagnosticsService } from './services/hidDiagnostics'
 
 // Before anything that can fail, so a failure during startup is logged and
 // captured like any other. An Electron app is several processes, so the
@@ -62,6 +64,7 @@ const CONSOLE_WINDOW_TITLE = 'Presentation Commander Client — Console'
 let mainWindow: BrowserWindow | null = null
 let programOutWindow: BrowserWindow | null = null
 let latestProgramOutState: ProgramOutState | null = null
+let hidDiagnostics: HidDiagnosticsService | null = null
 
 // Electron's `dialog.showOpenDialog` has separate overloads for "with parent
 // window" vs "no parent" — passing `BrowserWindow | undefined` satisfies
@@ -187,6 +190,7 @@ function createWindow(): void {
   // crashes trying to notify an already-destroyed mainWindow (see the
   // 'closed' handler below).
   win.on('close', () => {
+    hidDiagnostics?.stop()
     programOutWindow?.close()
   })
 
@@ -287,6 +291,23 @@ app.whenReady().then(() => {
 
   createWindow()
 
+  // No Raw Input monitor starts until the operator explicitly clicks Watch.
+  if (process.platform === 'win32') {
+    hidDiagnostics = new HidDiagnosticsService(
+      rawInputExecutablePath(app.getAppPath(), process.resourcesPath, app.isPackaged),
+      (status) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('hid:status', status)
+        }
+      },
+      (key) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('hid:key', key)
+        }
+      }
+    )
+  }
+
   // These listeners live for the app's whole lifetime, not for any one
   // window — they read the current module-level mainWindow (reassigned by
   // createWindow on every dock-icon reactivation) and guard against it
@@ -332,6 +353,25 @@ app.whenReady().then(() => {
     if (config.autoStart) oscControlServer.start()
   })
   fileControl.loadConfig()
+
+  // Only the console may initiate a HID diagnostics session (not Program Out).
+  function hidForConsole(event: Electron.IpcMainInvokeEvent): HidDiagnosticsService {
+    if (!mainWindow || mainWindow.isDestroyed() ||
+        event.sender !== mainWindow.webContents ||
+        event.senderFrame !== mainWindow.webContents.mainFrame || !hidDiagnostics) {
+      throw new Error('Diagnostyka HID jest dostępna tylko w konsoli Windows.')
+    }
+    return hidDiagnostics
+  }
+
+  ipcMain.handle('hid:list', (event) => hidForConsole(event).list())
+  ipcMain.handle('hid:status:get', (event) => hidForConsole(event).currentStatus())
+  ipcMain.handle('hid:watch', (event, deviceId: unknown) => {
+    const hid = hidForConsole(event)
+    if (typeof deviceId !== 'string') throw new Error('Nieprawidłowy odbiornik HID.')
+    return hid.start(deviceId)
+  })
+  ipcMain.handle('hid:stop', (event) => hidForConsole(event).stop())
 
   ipcMain.handle('screen-capture:list-sources', () => screenCaptureService.listSources())
   ipcMain.handle('screen-capture:set-active', (_e, sourceId: string | null) =>
@@ -558,6 +598,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  hidDiagnostics?.stop()
   serverLink.disconnect()
   ndiSenderService.stopAll()
   oscControlServer.shutdown()
