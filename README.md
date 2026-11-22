@@ -1,4 +1,32 @@
-# Presentation Commander — Client
+# GC-Presentation
+
+### Odtwarzacz prezentacji i niezależnych wyjść obrazu do realizacji wydarzeń.
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![CI](https://github.com/DjGreenKrk/GC-Presentation/actions/workflows/ci.yml/badge.svg)](https://github.com/DjGreenKrk/GC-Presentation/actions/workflows/ci.yml) [![Development status](https://img.shields.io/badge/status-development-orange.svg)](docs/ROADMAP.md)
+
+**Projekt w trakcie rozwoju — nie jest jeszcze zweryfikowany do emisji produkcyjnej.**
+
+GC-Presentation jest forkiem [Presentation Commander Client](https://github.com/stoatworks-labs/presentation-commander-client). Docelowo ma zapewnić lokalną emisję PDF/PPTX, niezależne widoki Program/Next/Presenter na wyjściach fizycznych i NDI oraz przypisywanie kontrolerów HID. Część tych funkcji to dopiero [plan rozwoju](docs/ROADMAP.md), a nie gotowe możliwości.
+
+[Architektura](docs/ARCHITECTURE.md) · [Branding](BRANDING.md) · [Standardy GreenCrew](https://github.com/DjGreenKrk/GreenCrew_Tools_Docs) · [MASTER #3](https://github.com/DjGreenKrk/GC-Presentation/issues/3)
+
+## Rozwój i testy
+
+```bash
+npm ci  # pełna instalacja wymaga poprawnie skonfigurowanego NDI SDK
+npm test
+npm run typecheck
+npm run build
+```
+
+[Zasady pracy](AGENTS.md) · [Baseline i ograniczenia CI](docs/ENGINEERING_BASELINE.md)
+
+**Oryginalny projekt:** autor Allan Sargeant, licencja MIT. Zachowujemy [LICENSE](LICENSE) i [ATTRIBUTIONS.md](ATTRIBUTIONS.md). Poniższa dokumentacja producenta pozostaje na razie jako materiał techniczny; linki do binariów prowadzą do **upstream**, a nie do wydań GC-Presentation.
+
+---
+
+## Dokumentacja odziedziczona po Presentation Commander
+
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. That covers the architecture, the
