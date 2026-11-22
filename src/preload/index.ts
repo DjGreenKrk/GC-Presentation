@@ -193,6 +193,7 @@ const api = {
     open: (displayId?: number): Promise<void> => ipcRenderer.invoke('program-out:open', displayId),
     close: (): Promise<void> => ipcRenderer.invoke('program-out:close'),
     isOpen: (): Promise<boolean> => ipcRenderer.invoke('program-out:is-open'),
+    getState: (): Promise<ProgramOutState | null> => ipcRenderer.invoke('program-out:get-state'),
     pushState: (state: ProgramOutState): Promise<void> =>
       ipcRenderer.invoke('program-out:push-state', state),
     onOpenChanged: (callback: (open: boolean) => void) => {
@@ -234,6 +235,7 @@ const api = {
     open: (displayId?: number): Promise<void> => ipcRenderer.invoke('next-out:open', displayId),
     close: (): Promise<void> => ipcRenderer.invoke('next-out:close'),
     isOpen: (): Promise<boolean> => ipcRenderer.invoke('next-out:is-open'),
+    getState: (): Promise<ProgramOutState | null> => ipcRenderer.invoke('next-out:get-state'),
     pushState: (state: ProgramOutState): Promise<void> =>
       ipcRenderer.invoke('next-out:push-state', state),
     onOpenChanged: (callback: (open: boolean) => void) => {
