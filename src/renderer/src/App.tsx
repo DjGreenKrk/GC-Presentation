@@ -21,6 +21,7 @@ import GoogleSlidesSetup from './components/GoogleSlidesSetup'
 import LiveCaptureControl from './components/LiveCaptureControl'
 import OscControl from './components/OscControl'
 import DiagnosticsPanel from './components/DiagnosticsPanel'
+import HidDiagnosticsControl from './components/HidDiagnosticsControl'
 import SetDefaultPdfAppControl from './components/SetDefaultPdfAppControl'
 import AutoAdvanceControl from './components/AutoAdvanceControl'
 import TransitionControl from './components/TransitionControl'
@@ -52,6 +53,7 @@ function App(): React.JSX.Element {
   const [nextNdiActive, setNextNdiActive] = useState(false)
   const nextNdiCanvasRef = useRef<HTMLCanvasElement>(document.createElement('canvas'))
   const [showGoogleSlidesSetup, setShowGoogleSlidesSetup] = useState(false)
+  const [hidDiagnosticsOpen, setHidDiagnosticsOpen] = useState(false)
   const [screenBlank, setScreenBlank] = useState<ScreenBlank>('none')
   const [hideCursor, setHideCursor] = useState(false)
   const [programOutOpen, setProgramOutOpen] = useState(false)
@@ -549,6 +551,10 @@ function App(): React.JSX.Element {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent): void => {
+      // Keyboard-emulating clickers still generate ordinary renderer keydown
+      // events while the GC-Presentation window has focus. Keep diagnostic
+      // mode incapable of accidentally advancing the live presentation.
+      if (hidDiagnosticsOpen) return
       const target = e.target as HTMLElement | null
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return
       if (
@@ -573,7 +579,7 @@ function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [totalPages])
+  }, [totalPages, hidDiagnosticsOpen])
 
   const openPdf = async (): Promise<void> => {
     const result = await window.api.pdf.open()
@@ -773,6 +779,12 @@ function App(): React.JSX.Element {
           />
           <SetDefaultPdfAppControl />
           <DiagnosticsPanel />
+          {platform === 'windows' && (
+            <HidDiagnosticsControl
+              expanded={hidDiagnosticsOpen}
+              onExpandedChange={setHidDiagnosticsOpen}
+            />
+          )}
           <button className="transport-btn" onClick={openPdf}>
             {filePath ? 'Open Different PDF…' : 'Open PDF…'}
           </button>

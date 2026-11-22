@@ -12,6 +12,7 @@ import type { FileControlConfig } from '../shared/files'
 import type { OscSection } from '../shared/sections'
 import type { ClientPlatform } from '../shared/protocol'
 import { toClientPlatform } from '../shared/platform'
+import type { HidDeviceInfo, HidDiagnosticKey, HidDiagnosticStatus } from '../shared/hidDiagnostics'
 
 interface OpenPdfResult {
   filePath: string
@@ -257,6 +258,24 @@ const api = {
       return (): void => {
         ipcRenderer.removeListener('osc:status-changed', listener)
       }
+    }
+  },
+  hid: {
+    listDevices: (): Promise<HidDeviceInfo[]> => ipcRenderer.invoke('hid:list'),
+    status: (): Promise<HidDiagnosticStatus> => ipcRenderer.invoke('hid:status:get'),
+    watch: (deviceId: string): Promise<void> => ipcRenderer.invoke('hid:watch', deviceId),
+    stop: (): Promise<void> => ipcRenderer.invoke('hid:stop'),
+    onStatus: (callback: (status: HidDiagnosticStatus) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, status: HidDiagnosticStatus): void =>
+        callback(status)
+      ipcRenderer.on('hid:status', listener)
+      return (): void => ipcRenderer.removeListener('hid:status', listener)
+    },
+    onKey: (callback: (key: HidDiagnosticKey) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, key: HidDiagnosticKey): void =>
+        callback(key)
+      ipcRenderer.on('hid:key', listener)
+      return (): void => ipcRenderer.removeListener('hid:key', listener)
     }
   },
   files: {

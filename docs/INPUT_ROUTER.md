@@ -78,3 +78,22 @@ W **x64 Developer Command Prompt** (z MSVC w PATH) uruchom `npm run build:raw-in
 **Prywatność:** ID urządzenia może zawierać numer instancji USB. Nie publikować surowych wyników `--list` w issue ani publicznych logach bez kontroli danych.
 
 **Ograniczenie Windows:** `RIDEV_INPUTSINK` zapewnia nasłuch przy nieaktywnym oknie GC-Presentation, ale nie przechwytuje ani nie wyłącza klawiszy wysyłanych do programu pierwszoplanowego. Test z OBS i PowerPoint pozostaje wymagany przed użyciem na sztuce.
+
+## Etap 3a — panel diagnostyczny (Draft)
+
+W konsoli na Windows pojawia się przycisk **HID — test**. To **nie jest jeszcze panel z aktywnym sterowaniem emisją**:
+
+1. Otwórz panel, kliknij **Odśwież**, wybierz konkretny odbiornik z listy. Lista nie rozpoczyna monitorowania klawiszy.
+2. Kliknij **Testuj przyciski**, naciśnij kilka przycisków wybranego pilota i sprawdź wykryte kody `kbd:scan:...` (lub awaryjne `kbd:vkey:...`).
+3. Możesz wybrać akcję przy każdym kodzie, ale są to **tymczasowe mapowania pokazowe**, niezapisywane i niewykonywane.
+4. **Zatrzymaj** kończy sesję odbiornika; zamknięcie panelu również najpierw zatrzymuje nasłuch, a dopiero potem przywraca zwykłe skróty prezentacji.
+
+W stanie otwartego panelu lokalne `keydown` w GC-Presentation (PageDown, strzałki, `b`, `w`) **nie wykonują akcji prezentacji**. To ważne, bo Windows i tak wysyła klawisze emitowane przez pilot-klawiaturę do aktywnej aplikacji. Nie chroni to **innych programów** (OBS/PowerPoint) będących na wierzchu — sprawdzić bez emisji na żywo.
+
+Bezpieczeństwo granicy Electron:
+- Tylko konsola główna (`mainWindow.webContents.mainFrame`) może wywołać IPC `hid:list/status:watch/stop`; okna wyjściowe Program/Next/Presenter nie uzyskują uprawnień.
+- Start ponownie sprawdza, czy dokładny identyfikator odbiornika jest obecny na aktualnej liście; nie wystarczy sam VID/PID. Nasłuch nie startuje automatycznie.
+- Po odłączeniu, zamknięciu konsoli lub zatrzymaniu obserwacji nie następuje automatyczne przełączenie na inną klawiaturę.
+- Pełne identyfikatory sprzętowe nie są emitowane w zdarzeniach klawiszy, ani do raportów telemetrycznych.
+
+**Pozostaje do zrobienia:** potwierdzona kompilacja Windows i test fizyczny Baseusa/GC CUE, trwały zapis nieaktywnych profili i ich zatwierdzanie, bezpieczne przekazanie zatwierdzonych akcji do centralnego Presentation Controller, test pracy w tle z OBS. Do tego czasu Issue #7 pozostaje otwarte.
