@@ -19,6 +19,7 @@ import { setAsDefaultPdfHandler } from './services/defaultPdfHandler'
 import type { RegisterMessage, SlideStateMessage } from '../shared/protocol'
 import { toClientPlatform } from '../shared/platform'
 import type { ProgramOutState, LaserPosition } from '../shared/programOut'
+import type { PresenterOutState } from '../shared/presenterOut'
 import type { OscArg, OscConfig } from '../shared/osc'
 import { collectDiagnostics, init as initDiag, say } from './diag/index.js'
 import { installElectronDiagnostics } from './diag/electron.js'
@@ -62,8 +63,10 @@ const CONSOLE_WINDOW_TITLE = 'Presentation Commander Client — Console'
 let mainWindow: BrowserWindow | null = null
 let programOutWindow: BrowserWindow | null = null
 let nextOutWindow: BrowserWindow | null = null
+let presenterOutWindow: BrowserWindow | null = null
 let latestProgramOutState: ProgramOutState | null = null
 let latestNextOutState: ProgramOutState | null = null
+let latestPresenterOutState: PresenterOutState | null = null
 
 // Electron's `dialog.showOpenDialog` has separate overloads for "with parent
 // window" vs "no parent" — passing `BrowserWindow | undefined` satisfies
@@ -191,6 +194,7 @@ function createWindow(): void {
   win.on('close', () => {
     programOutWindow?.close()
     nextOutWindow?.close()
+    presenterOutWindow?.close()
   })
 
   if (is.dev) {
@@ -207,19 +211,34 @@ function createWindow(): void {
   loadRenderer(win)
 }
 
-type PhysicalOutput = 'program' | 'next'
+type PhysicalOutput = 'program' | 'next' | 'presenter'
 
-/** Independent native fullscreen outputs. The console owns both windows. */
+function getOutputWindow(kind: PhysicalOutput): BrowserWindow | null {
+  if (kind === 'program') return programOutWindow
+  if (kind === 'next') return nextOutWindow
+  return presenterOutWindow
+}
+
+/** Independent native fullscreen outputs; one role per physical display. */
 function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
-  if (kind === 'program' ? programOutWindow : nextOutWindow) return
+  if (getOutputWindow(kind)) return
   const owner = mainWindow
   if (!owner || owner.isDestroyed()) return
   const displays = screen.getAllDisplays()
   const primary = screen.getPrimaryDisplay()
   const chosen = displayId === undefined ? undefined : displays.find((d) => d.id === displayId)
-  const target = chosen ?? displays.find((d) => d.id !== primary.id) ?? primary
-  const prefix = kind === 'program' ? 'program-out' : 'next-out'
-  const title = kind === 'program' ? 'Program Out' : 'Next Slide Out'
+  const occupied = new Set(
+    (['program', 'next', 'presenter'] as const)
+      .filter((name) => name !== kind)
+      .map(getOutputWindow)
+      .filter((win): win is BrowserWindow => Boolean(win && !win.isDestroyed()))
+      .map((win) => screen.getDisplayMatching(win.getBounds()).id)
+  )
+  const target = chosen ?? displays.find((d) => d.id !== primary.id && !occupied.has(d.id)) ?? displays.find((d) => !occupied.has(d.id))
+  if (!target) throw new Error('Brak wolnego monitora dla tego wyjścia')
+  if (occupied.has(target.id)) throw new Error('Ten monitor jest już zajęty przez inne wyjście')
+  const prefix = kind === 'program' ? 'program-out' : kind === 'next' ? 'next-out' : 'presenter-out'
+  const title = kind === 'program' ? 'Program Out' : kind === 'next' ? 'Next Slide Out' : 'Presenter Out'
   const win = new BrowserWindow({
     x: target.bounds.x,
     y: target.bounds.y,
@@ -246,18 +265,20 @@ function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
   }
   win.on('closed', () => {
     if (kind === 'program') programOutWindow = null
-    else nextOutWindow = null
+    else if (kind === 'next') nextOutWindow = null
+    else presenterOutWindow = null
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(`${prefix}:open-changed`, false)
     }
   })
   win.webContents.once('did-finish-load', () => {
-    const latest = kind === 'program' ? latestProgramOutState : latestNextOutState
+    const latest = kind === 'program' ? latestProgramOutState : kind === 'next' ? latestNextOutState : latestPresenterOutState
     if (latest && !win.isDestroyed()) win.webContents.send(`${prefix}:state`, latest)
   })
   loadRenderer(win, prefix)
   if (kind === 'program') programOutWindow = win
-  else nextOutWindow = win
+  else if (kind === 'next') nextOutWindow = win
+  else presenterOutWindow = win
   owner.webContents.send(`${prefix}:open-changed`, true)
 }
 
@@ -272,6 +293,12 @@ function closeNextOut(): void {
 }
 function openNextOut(displayId?: number): void {
   openPhysicalOutput('next', displayId)
+}
+function closePresenterOut(): void {
+  presenterOutWindow?.close()
+}
+function openPresenterOut(displayId?: number): void {
+  openPhysicalOutput('presenter', displayId)
 }
 
 app.whenReady().then(() => {
@@ -471,10 +498,23 @@ app.whenReady().then(() => {
     nextOutWindow?.webContents.send('next-out:state', state)
   })
 
+  ipcMain.handle('presenter-out:list-displays', () => listDisplays())
+  ipcMain.handle('presenter-out:open', (_e, displayId?: number) => openPresenterOut(displayId))
+  ipcMain.handle('presenter-out:close', () => closePresenterOut())
+  ipcMain.handle('presenter-out:is-open', () => presenterOutWindow !== null)
+  ipcMain.handle('presenter-out:get-state', () => latestPresenterOutState)
+  ipcMain.handle('presenter-out:push-state', (_e, state: PresenterOutState) => {
+    latestPresenterOutState = state
+    if (presenterOutWindow && !presenterOutWindow.isDestroyed()) {
+      presenterOutWindow.webContents.send('presenter-out:state', state)
+    }
+  })
+
   screen.on('display-added', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('program-out:displays-changed', listDisplays())
       mainWindow.webContents.send('next-out:displays-changed', listDisplays())
+      mainWindow.webContents.send('presenter-out:displays-changed', listDisplays())
     }
   })
   screen.on('display-removed', () => {
