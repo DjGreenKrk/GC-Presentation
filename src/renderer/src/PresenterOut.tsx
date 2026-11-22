@@ -8,12 +8,14 @@ function SlidePreview({
   source,
   page,
   doc,
-  which
+  which,
+  emptyText = 'Brak następnego slajdu'
 }: {
   source: PresenterSlideSource
   page: number | null
   doc: PDFDocumentProxy | null
   which: 'current' | 'next'
+  emptyText?: string
 }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -41,7 +43,7 @@ function SlidePreview({
   return (
     <div className="presenter-preview-frame" ref={containerRef}>
       {page === null ? (
-        <div className="presenter-preview-empty">Brak następnego slajdu</div>
+        <div className="presenter-preview-empty">{emptyText}</div>
       ) : source.kind === 'pdf' ? (
         doc ? <canvas ref={canvasRef} /> : <div className="presenter-preview-empty">Ładowanie…</div>
       ) : imageUrl ? (
@@ -58,20 +60,32 @@ function SlidePreview({
 function PresenterOut(): React.JSX.Element {
   const [state, setState] = useState<PresenterOutState | null>(null)
   const [pdf, setPdf] = useState<{ data: string; doc: PDFDocumentProxy } | null>(null)
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null)
   const pdfData = state?.source.kind === 'pdf' ? state.source.data : null
 
   useEffect(() => {
-    // Subscribe before requesting a snapshot: a window opened mid-show must
-    // receive the latest state even when it misses the first push event.
-    const unsubscribe = window.api.presenterOut.onState(setState)
+    // Subscribe before requesting a snapshot. A concurrent newer push must not
+    // be overwritten by a delayed reply containing an older snapshot.
+    let receivedPush = false
+    const unsubscribe = window.api.presenterOut.onState((next) => {
+      receivedPush = true
+      setState(next)
+    })
     window.api.presenterOut.getState().then((snapshot) => {
-      if (snapshot) setState(snapshot)
+      if (!receivedPush && snapshot) setState(snapshot)
     }).catch((err) => console.error('Presenter state unavailable:', err))
     return unsubscribe
   }, [])
 
   useEffect(() => {
-    if (!pdfData) return
+    if (!pdfData) {
+      if (pdfDocRef.current) {
+        void pdfDocRef.current.destroy()
+        pdfDocRef.current = null
+      }
+      setPdf(null)
+      return
+    }
     let cancelled = false
     loadPdf(pdfData)
       .then((doc) => {
@@ -79,19 +93,23 @@ function PresenterOut(): React.JSX.Element {
           void doc.destroy()
           return
         }
-        setPdf((previous) => {
-          if (previous && previous.data !== pdfData) void previous.doc.destroy()
-          return { data: pdfData, doc }
-        })
+        if (pdfDocRef.current && pdfDocRef.current !== doc) void pdfDocRef.current.destroy()
+        pdfDocRef.current = doc
+        setPdf({ data: pdfData, doc })
       })
       .catch((err) => console.error('Presenter PDF failed to load:', err))
     return () => { cancelled = true }
   }, [pdfData])
 
+  useEffect(() => () => {
+    if (pdfDocRef.current) void pdfDocRef.current.destroy()
+  }, [])
+
   if (!state) return <div className="presenter-out-loading">Oczekiwanie na prezentację</div>
   const { source, currentPage, totalPages, fileName, programBlank, nextAvailable } = state
   const activeDoc = source.kind === 'pdf' && pdf?.data === source.data ? pdf.doc : null
-  const nextPage = nextAvailable && currentPage < totalPages ? currentPage + 1 : null
+  const hasNextPage = currentPage < totalPages
+  const nextPage = nextAvailable && hasNextPage ? currentPage + 1 : null
 
   return (
     <main className="presenter-out">
@@ -109,7 +127,7 @@ function PresenterOut(): React.JSX.Element {
         </div>
         <div className="presenter-out-card presenter-out-next">
           <div className="presenter-out-label">NASTĘPNY</div>
-          <SlidePreview source={source} page={nextPage} doc={activeDoc} which="next" />
+          <SlidePreview source={source} page={nextPage} doc={activeDoc} which="next" emptyText={hasNextPage ? 'Podgląd niedostępny' : 'Brak następnego slajdu'} />
         </div>
       </section>
       <section className="presenter-out-notes">
