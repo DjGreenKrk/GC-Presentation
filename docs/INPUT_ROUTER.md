@@ -1,6 +1,6 @@
 # Input Router — projekt sterowania urządzeniami HID
 
-Status: **etap 1/3, szkic wykonawczy** (2026-11-22). [Issue #7](https://github.com/DjGreenKrk/GC-Presentation/issues/7) · [MASTER #3](https://github.com/DjGreenKrk/GC-Presentation/issues/3) · [Architektura](ARCHITECTURE.md)
+Status: **etap 2/3, pomocniczy adapter Windows w Draft, bez aktywnej emisji** (2026-11-22). [Issue #7](https://github.com/DjGreenKrk/GC-Presentation/issues/7) · [MASTER #3](https://github.com/DjGreenKrk/GC-Presentation/issues/3) · [Architektura](ARCHITECTURE.md)
 
 ## Cel
 
@@ -26,7 +26,7 @@ GC CUE może z czasem wystawiać **własny HID usage/report**, który ma mniejsz
 ## Podział modułów
 
 ```text
-Win32 Raw Input worker (PR przyszły)
+Win32 Raw Input helper + Node transport (Draft, bez UI)
      │ rozpoznane urządzenie / klawisz / key down/up
      ▼
 Normalized InputDeviceEvent
@@ -41,7 +41,7 @@ Centralny kontroler prezentacji (przyszły, jedyny wykonawca)
 Program / Next / Presenter / NDI
 ```
 
-**Ten PR implementuje tylko czystą, testowalną domenę `DeviceInputRouter` i testy.** Nie odbiera jeszcze fizycznych zdarzeń Raw Input; nie daje operatorowi fałszywego przycisku „HID aktywny”.
+**PR #16 implementuje czystą domenę `DeviceInputRouter` i testy.** Kolejny Draft (oparty na #16) dodaje natywny helper Win32 i warstwę transportową Node. Nie uruchamia ich automatycznie, nie ma jeszcze parowania ani połączenia z emisją.
 
 ## Model i bezpieczeństwo
 
@@ -62,7 +62,19 @@ Program / Next / Presenter / NDI
 ## Etapy wdrożenia
 
 1. **Core (ten PR):** modele, walidacja, brak domyślnej władzy urządzeń, wciśnięcia/zwolnienia, testy bez Electrona i NDI.
-2. **Adapter Windows:** osobny proces/N-API z Raw Input, enumeracją, sygnalizacją hotplug i autodiagnostyką; test interfejsu na prawdziwym Baseus/GC CUE.
+2. **Adapter Windows (Draft):** osobny proces `native/raw-input-helper/raw_input.cpp` z trybami `--list` i `--watch <exact-device-path>`, protokół NDJSON, `RawInputHelperClient`, kompilacja Windows i pakowanie poza ASAR. Brak uruchamiania przy starcie, brak automatycznego parowania. Wciąż konieczny test na Baseusie/GC CUE.
 3. **Integracja operatorska:** lista rzeczywiście wykrytych urządzeń, tryb uczenia mapowania, profile lokalne, komendy poprzez centralny kontroler, rozdzielenie klawiatury operatorskiej od Raw Input (bez podwójnych akcji).
 
 Odbiór etapu #7 dopiero po rzeczywistym teście Win32 + OBS w fokusie, a także zachowania zwykłych klawiszy w aktywnej aplikacji. Dopóki adapter nie jest przetestowany, system pozostaje wyłączony / niedostępny w interfejsie.
+
+## Diagnostyka adaptera (Windows, etap 2)
+
+W **x64 Developer Command Prompt** (z MSVC w PATH) uruchom `npm run build:raw-input`. Powstanie `native/raw-input-helper/bin/gc-raw-input.exe` (wynik ignorowany przez Git). Windows CI kompiluje helper i wykonuje bezpieczny test enumeracji; instalator dołącza exe pod `resources/hid/gc-raw-input.exe`, poza ASAR. Linux i macOS nie wymagają helpera.
+
+- `gc-raw-input.exe --list` wypisuje po jednej linii JSON `{ "type": "device", "id": "...", "label": "..." }`. To tylko **wyliczanie odbiorników**, bez śledzenia naciśnięć.
+- `gc-raw-input.exe --watch "<dokładne ID z listy>"` uruchamia nasłuch **dopiero po wybraniu konkretnego odbiornika**. Zwraca `ready`, `event` (sprzętowy kod `down/up`) i `disconnected` przy wyjęciu USB. Nie ma fallbacku na dowolną klawiaturę i nie ma automatycznego restartu.
+- `src/shared/rawInputProtocol.ts` odrzuca błędne/nieznane linie JSON. `src/main/services/rawInputHelper.ts` ma ograniczenie czasu enumeracji, kończy obserwację po utracie procesu i przekazuje zdarzenia ze wskazaną tożsamością urządzenia. **Nie emituje komend slajdów.**
+
+**Prywatność:** ID urządzenia może zawierać numer instancji USB. Nie publikować surowych wyników `--list` w issue ani publicznych logach bez kontroli danych.
+
+**Ograniczenie Windows:** `RIDEV_INPUTSINK` zapewnia nasłuch przy nieaktywnym oknie GC-Presentation, ale nie przechwytuje ani nie wyłącza klawiszy wysyłanych do programu pierwszoplanowego. Test z OBS i PowerPoint pozostaje wymagany przed użyciem na sztuce.

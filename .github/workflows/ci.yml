@@ -61,7 +61,7 @@ jobs:
         shell: pwsh
         run: |
           npm run build:raw-input
-          $rows = & 'native/raw-input-helper/bin/gc-raw-input.exe' --list
+          $rows = & '.\\native\\raw-input-helper\\bin\\gc-raw-input.exe' --list
           if ($LASTEXITCODE -ne 0) { throw 'Raw Input helper --list failed' }
           foreach ($row in $rows) {
             $device = $row | ConvertFrom-Json
