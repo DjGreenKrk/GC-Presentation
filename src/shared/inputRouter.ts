@@ -97,10 +97,15 @@ export class DeviceInputRouter {
       resolved.set(profile.deviceId, { enabled: profile.enabled, actions })
     }
 
-    // Swap atomically after validation. Existing pressed keys are cleared when
-    // the configuration changes; a removed device can never retain authority.
+    // Swap atomically after validation. Preserve physical key-down state for
+    // still-enabled devices: remapping an already-held button must never fire
+    // another action until its real key-up arrives.
+    const retained = new Map<string, Set<string>>()
+    for (const [deviceId, keys] of this.held) {
+      if (resolved.get(deviceId)?.enabled) retained.set(deviceId, keys)
+    }
     this.profiles = resolved
-    this.held.clear()
+    this.held = retained
   }
 
   handle(event: InputDeviceEvent): InputAction | null {
