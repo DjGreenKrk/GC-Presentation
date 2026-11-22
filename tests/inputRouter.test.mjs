@@ -82,6 +82,9 @@ test('reconfiguring mappings is atomic, and old keys lose authority', () => {
     ...baseus,
     bindings: [{ code: 'kbd:scan:0x51', action: 'first-slide' }]
   }])
+  // A key physically held while the mapping changes must stay held.
+  assert.equal(router.handle(next), null)
+  router.handle({ ...next, phase: 'up' })
   assert.equal(router.handle(next), 'first-slide')
   assert.throws(() => router.setProfiles([{ ...baseus, bindings: [
     { code: 'kbd:scan:0x51', action: 'next-slide' },
