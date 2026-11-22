@@ -57,6 +57,15 @@
   -webkit-app-region: no-drag;
 }
 
+.program-out-error {
+  display: inline-block;
+  max-width: 240px;
+  color: #ff5252;
+  font-size: 11px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .program-out-hide-cursor {
   display: flex;
   align-items: center;

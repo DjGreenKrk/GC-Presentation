@@ -7,6 +7,7 @@ import type {
   SlideStateMessage
 } from '../shared/protocol'
 import type { ProgramOutState, LaserPosition } from '../shared/programOut'
+import type { PresenterOutState } from '../shared/presenterOut'
 import type { OscArg, OscAction, OscConfig } from '../shared/osc'
 import type { FileControlConfig } from '../shared/files'
 import type { OscSection } from '../shared/sections'
@@ -192,6 +193,7 @@ const api = {
     open: (displayId?: number): Promise<void> => ipcRenderer.invoke('program-out:open', displayId),
     close: (): Promise<void> => ipcRenderer.invoke('program-out:close'),
     isOpen: (): Promise<boolean> => ipcRenderer.invoke('program-out:is-open'),
+    getState: (): Promise<ProgramOutState | null> => ipcRenderer.invoke('program-out:get-state'),
     pushState: (state: ProgramOutState): Promise<void> =>
       ipcRenderer.invoke('program-out:push-state', state),
     onOpenChanged: (callback: (open: boolean) => void) => {
@@ -233,6 +235,7 @@ const api = {
     open: (displayId?: number): Promise<void> => ipcRenderer.invoke('next-out:open', displayId),
     close: (): Promise<void> => ipcRenderer.invoke('next-out:close'),
     isOpen: (): Promise<boolean> => ipcRenderer.invoke('next-out:is-open'),
+    getState: (): Promise<ProgramOutState | null> => ipcRenderer.invoke('next-out:get-state'),
     pushState: (state: ProgramOutState): Promise<void> =>
       ipcRenderer.invoke('next-out:push-state', state),
     onOpenChanged: (callback: (open: boolean) => void) => {
@@ -257,6 +260,33 @@ const api = {
       return (): void => {
         ipcRenderer.removeListener('next-out:state', listener)
       }
+    }
+  },
+
+  presenterOut: {
+    listDisplays: (): Promise<DisplayInfo[]> => ipcRenderer.invoke('presenter-out:list-displays'),
+    open: (displayId?: number): Promise<void> => ipcRenderer.invoke('presenter-out:open', displayId),
+    close: (): Promise<void> => ipcRenderer.invoke('presenter-out:close'),
+    isOpen: (): Promise<boolean> => ipcRenderer.invoke('presenter-out:is-open'),
+    getState: (): Promise<PresenterOutState | null> => ipcRenderer.invoke('presenter-out:get-state'),
+    pushState: (state: PresenterOutState): Promise<void> =>
+      ipcRenderer.invoke('presenter-out:push-state', state),
+    onOpenChanged: (callback: (open: boolean) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, open: boolean): void => callback(open)
+      ipcRenderer.on('presenter-out:open-changed', listener)
+      return (): void => ipcRenderer.removeListener('presenter-out:open-changed', listener)
+    },
+    onDisplaysChanged: (callback: (displays: DisplayInfo[]) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, displays: DisplayInfo[]): void =>
+        callback(displays)
+      ipcRenderer.on('presenter-out:displays-changed', listener)
+      return (): void => ipcRenderer.removeListener('presenter-out:displays-changed', listener)
+    },
+    onState: (callback: (state: PresenterOutState) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, state: PresenterOutState): void =>
+        callback(state)
+      ipcRenderer.on('presenter-out:state', listener)
+      return (): void => ipcRenderer.removeListener('presenter-out:state', listener)
     }
   },
   ndiOutput: {
