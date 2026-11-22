@@ -73,10 +73,41 @@ of Program Out and of both NDI senders; Escape closes only the window with focus
   stays black rather than misleadingly showing the current slide.
 - On the last slide, Next Out goes black instead of holding a stale preview.
 - The output currently uses the same cursor-hiding setting as Program Out.
-- The app does not yet prevent choosing the **same display** for Program and Next; give them
-  separate displays to avoid fullscreen windows covering one another.
+- Each physical output requires a free OS display; the app rejects assigning the same
+  monitor to two outputs at once and shows an error to the operator.
 - Physical output needs an attached OS display. NDI remains available without one.
-- Presenter Out, custom HTML layouts, and independent output routing are future work.
+- Custom HTML layouts and full persistent routing configuration are future work.
+
+## Physical Presenter Out (GC-Presentation fork; stacked Draft PR)
+
+Use **Presenter Out** beside Program and Next to open a dedicated confidence monitor.
+It shows current slide, upcoming slide (when available), current-slide presenter notes
+and a large slide counter. The screen is read-only: no transport buttons or editor controls.
+
+- For PDF, current and next render from one copy of the document in this output window.
+- For pre-rendered PowerPoint/Keynote frames, the window shows their existing static images.
+  It **does not** play PowerPoint animations; those are a separate planned Live adapter.
+- Google Slides/Canva currently have **no future-frame preview**; Presenter says
+  'Podgląd niedostępny' rather than inventing the next slide.
+- Black/white Program blanking is indicated in Presenter, but does not hide the notes.
+- On the final slide, Presenter clearly says there is no next slide.
+- If a display is used by Program or Next, it cannot simultaneously be assigned to Presenter.
+  With three physical outputs you normally need three displays in addition to any console
+  arrangement you want to keep visible.
+
+### Presenter rig check
+
+1. Connect three displays and open a PDF with a notes sidecar.
+2. Assign Program, Next and Presenter to different displays.
+3. Navigate through slides and verify notes/current/next update independently.
+4. Use B/W on the operator console; Program blanks, Presenter keeps previews and
+   indicates the Program state.
+5. Unplug an output monitor and verify Program is not silently replaced.
+6. Verify no NDI sender needs to be running to use the physical outputs.
+
+**Current validation status:** code is in a stacked Draft PR. These checks
+need to be completed on physical Windows hardware; no GitHub CI run has yet
+been observed on the fork.
 
 ### Quick event-rig check
 
