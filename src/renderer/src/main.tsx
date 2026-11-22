@@ -10,8 +10,14 @@ import ProgramOut from './ProgramOut'
 // have run yet, and it merges rather than overwriting. See public/about.js.
 window.STOATWORKS_ABOUT = { ...window.STOATWORKS_ABOUT, version: __APP_VERSION__ }
 
-const isProgramOut = new URLSearchParams(window.location.search).get('mode') === 'program-out'
+const outputMode = new URLSearchParams(window.location.search).get('mode')
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{isProgramOut ? <ProgramOut /> : <App />}</StrictMode>
+  <StrictMode>
+    {outputMode === 'program-out' || outputMode === 'next-out' ? (
+      <ProgramOut mode={outputMode === 'next-out' ? 'next' : 'program'} />
+    ) : (
+      <App />
+    )}
+  </StrictMode>
 )
