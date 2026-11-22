@@ -53,6 +53,21 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      - name: Compile and smoke-test optional Raw Input helper
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm run build:raw-input
+          $rows = & '.\\native\\raw-input-helper\\bin\\gc-raw-input.exe' --list
+          if ($LASTEXITCODE -ne 0) { throw 'Raw Input helper --list failed' }
+          foreach ($row in $rows) {
+            $device = $row | ConvertFrom-Json
+            if ($device.type -ne 'device') { throw 'Raw Input device listing is not NDJSON' }
+          }
+
       # Covers main/preload and renderer/web separately — a bare tsc misses one.
       - name: Unit tests (no NDI SDK needed)
         run: npm test

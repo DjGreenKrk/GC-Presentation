@@ -38,6 +38,10 @@ asarUnpack:
   - '**/*.dll'
 win:
   executableName: presentation-commander-client
+  # Optional Windows-only executable, never inside app.asar.
+  extraResources:
+    - from: native/raw-input-helper/bin/gc-raw-input.exe
+      to: hid/gc-raw-input.exe
   # x64 ONLY, deliberately. The NDI addons are native code and `npmRebuild` is
   # off, so an arm64 target just repackages whatever .node was last built —
   # v1.1.0/v1.2.0 shipped arm64 installers carrying x86-64 addons and an x64

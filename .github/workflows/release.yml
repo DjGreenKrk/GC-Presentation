@@ -119,6 +119,13 @@ jobs:
           done
           rm -rf native/*/vendor-sdk
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: matrix.os == 'windows-latest'
+
+      - name: Build Raw Input helper (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npm run build:raw-input
+
       - name: Compile (electron-vite)
         run: npx electron-vite build
 

@@ -16,7 +16,8 @@
     "postinstall": "electron-builder install-app-deps",
     "clean:native-sdk-links": "node scripts/clean-native-sdk-links.js",
     "build:unpack": "npm run build && npm run clean:native-sdk-links && electron-builder --dir",
-    "build:win": "npm run build && npm run clean:native-sdk-links && electron-builder --win --publish never",
+    "build:raw-input": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-raw-input.ps1",
+    "build:win": "npm run build:raw-input && npm run build && npm run clean:native-sdk-links && electron-builder --win --publish never",
     "build:mac": "electron-vite build && npm run clean:native-sdk-links && electron-builder --mac --publish never",
     "build:linux": "electron-vite build && npm run clean:native-sdk-links && electron-builder --linux --publish never",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"
