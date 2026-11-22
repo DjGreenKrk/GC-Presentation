@@ -62,6 +62,31 @@ confidence monitor. Pick which connected display it opens on from the dropdown.
 - **NDI is independent of this window.** You can send NDI without opening Program Out, and vice
   versa, because NDI is a network output, not a local display.
 
+## Physical Next Slide Out (GC-Presentation fork)
+
+Use **Next Out** beside Program Out to place the upcoming slide on a **separate physical
+display**. Choose a monitor in the dropdown, then open the fullscreen window. It is independent
+of Program Out and of both NDI senders; Escape closes only the window with focus.
+
+- PDF, Keynote, and PowerPoint show the next pre-rendered slide.
+- Google Slides and Canva do **not** expose a future slide frame to the client. Their Next Out
+  stays black rather than misleadingly showing the current slide.
+- On the last slide, Next Out goes black instead of holding a stale preview.
+- The output currently uses the same cursor-hiding setting as Program Out.
+- The app does not yet prevent choosing the **same display** for Program and Next; give them
+  separate displays to avoid fullscreen windows covering one another.
+- Physical output needs an attached OS display. NDI remains available without one.
+- Presenter Out, custom HTML layouts, and independent output routing are future work.
+
+### Quick event-rig check
+
+1. Connect two external displays (e.g. ATEM input and a confidence monitor).
+2. Open a multi-slide PDF. Set Program Out to the first screen and Next Out to the second.
+3. Advance several pages. Check Program shows page N and Next shows page N+1.
+4. Jump to the final page and verify Next goes black.
+5. Verify both outputs still work with **both** NDI toggles off.
+6. Close Next with Escape, reopen it, then disconnect/reconnect its display and confirm behavior.
+
 ## NDI output
 Two independent senders, each with its own toggle:
 

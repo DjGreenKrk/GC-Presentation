@@ -169,6 +169,32 @@ function App(): React.JSX.Element {
     })
   }, [activeSource, currentPage, screenBlank, hideCursor, laserPointerEnabled, transition])
 
+  // A dedicated physical Next output is independent of Program Out and NDI.
+  // Browser-bridged sources cannot provide future frames; show black instead of
+  // presenting the current slide as if it were the next one.
+  useEffect(() => {
+    if (!activeSource || !currentPage || !totalPages) return
+    const nextPage = currentPage < totalPages ? currentPage + 1 : null
+    const supportsFutureFrames =
+      activeSource.kind !== 'google-slides' && activeSource.kind !== 'canva'
+    if (nextPage !== null && supportsFutureFrames) {
+      window.api.nextOut.pushState({
+        ...activeSource.getProgramOutPayload(nextPage),
+        hideCursor,
+        transition: { effect: 'cut', durationMs: 0, direction: 'left' }
+      })
+    } else {
+      // At the end of the deck there is no Next slide. Never hold a stale one.
+      window.api.nextOut.pushState({
+        kind: 'image',
+        fileUrl: '',
+        currentPage,
+        hideCursor,
+        screenBlank: 'black'
+      })
+    }
+  }, [activeSource, currentPage, totalPages, hideCursor])
+
   useEffect(() => {
     window.api.ndiOutput.isActive(NDI_STREAM_PROGRAM).then(setNdiActive)
     window.api.ndiOutput.isActive(NDI_STREAM_NEXT).then(setNextNdiActive)
@@ -741,6 +767,12 @@ function App(): React.JSX.Element {
           )}
           <ProgramOutControl
             disabled={!activeSource}
+            hideCursor={hideCursor}
+            onHideCursorChange={setHideCursor}
+          />
+          <ProgramOutControl
+            variant="next"
+            disabled={!activeSource || !totalPages}
             hideCursor={hideCursor}
             onHideCursorChange={setHideCursor}
           />

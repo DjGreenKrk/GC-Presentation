@@ -61,7 +61,9 @@ const CONSOLE_WINDOW_TITLE = 'Presentation Commander Client — Console'
 
 let mainWindow: BrowserWindow | null = null
 let programOutWindow: BrowserWindow | null = null
+let nextOutWindow: BrowserWindow | null = null
 let latestProgramOutState: ProgramOutState | null = null
+let latestNextOutState: ProgramOutState | null = null
 
 // Electron's `dialog.showOpenDialog` has separate overloads for "with parent
 // window" vs "no parent" — passing `BrowserWindow | undefined` satisfies
@@ -188,6 +190,7 @@ function createWindow(): void {
   // 'closed' handler below).
   win.on('close', () => {
     programOutWindow?.close()
+    nextOutWindow?.close()
   })
 
   if (is.dev) {
@@ -204,20 +207,19 @@ function createWindow(): void {
   loadRenderer(win)
 }
 
-function closeProgramOut(): void {
-  programOutWindow?.close()
-}
+type PhysicalOutput = 'program' | 'next'
 
-function openProgramOut(displayId?: number): void {
-  if (programOutWindow) return
+/** Independent native fullscreen outputs. The console owns both windows. */
+function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
+  if (kind === 'program' ? programOutWindow : nextOutWindow) return
   const owner = mainWindow
   if (!owner || owner.isDestroyed()) return
-
   const displays = screen.getAllDisplays()
   const primary = screen.getPrimaryDisplay()
-  const chosen = displayId !== undefined ? displays.find((d) => d.id === displayId) : undefined
+  const chosen = displayId === undefined ? undefined : displays.find((d) => d.id === displayId)
   const target = chosen ?? displays.find((d) => d.id !== primary.id) ?? primary
-
+  const prefix = kind === 'program' ? 'program-out' : 'next-out'
+  const title = kind === 'program' ? 'Program Out' : 'Next Slide Out'
   const win = new BrowserWindow({
     x: target.bounds.x,
     y: target.bounds.y,
@@ -227,55 +229,49 @@ function openProgramOut(displayId?: number): void {
     frame: false,
     backgroundColor: '#000000',
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-
-  // Named after the display it is actually on, because on a multi-screen rig
-  // "which output is this?" is the question the window manager is being asked
-  // in the first place.
-  nameWindow(
-    win,
-    `Presentation Commander Client — Program Out (${displayLabel(target, displays.indexOf(target))})`
-  )
-
-  // Setting fullscreen at construction time can leave the window invisible
-  // to the OS window server on macOS; show it plain first, then transition.
+  nameWindow(win, `Presentation Commander Client — ${title} (${displayLabel(target, displays.indexOf(target))})`)
   win.once('ready-to-show', () => {
     win.show()
     win.setFullScreen(true)
   })
-
   win.webContents.on('before-input-event', (_event, input) => {
-    if (input.key === 'Escape') closeProgramOut()
+    if (input.key === 'Escape') win.close()
   })
-
   if (is.dev) {
     win.webContents.on('console-message', (event) => {
-      say.info(`[program-out:${event.level}] ${event.message}`)
+      say.info(`[${prefix}:${event.level}] ${event.message}`)
     })
   }
-
   win.on('closed', () => {
-    programOutWindow = null
-    // The main window may have been closed and reopened (or destroyed
-    // outright) by the time this fires — always resolve the *current*
-    // module-level mainWindow rather than the `owner` captured above, and
-    // guard against it being null/destroyed.
+    if (kind === 'program') programOutWindow = null
+    else nextOutWindow = null
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('program-out:open-changed', false)
+      mainWindow.webContents.send(`${prefix}:open-changed`, false)
     }
   })
-
   win.webContents.once('did-finish-load', () => {
-    if (latestProgramOutState) win.webContents.send('program-out:state', latestProgramOutState)
+    const latest = kind === 'program' ? latestProgramOutState : latestNextOutState
+    if (latest && !win.isDestroyed()) win.webContents.send(`${prefix}:state`, latest)
   })
+  loadRenderer(win, prefix)
+  if (kind === 'program') programOutWindow = win
+  else nextOutWindow = win
+  owner.webContents.send(`${prefix}:open-changed`, true)
+}
 
-  loadRenderer(win, 'program-out')
-  programOutWindow = win
-  owner.webContents.send('program-out:open-changed', true)
+function closeProgramOut(): void {
+  programOutWindow?.close()
+}
+function openProgramOut(displayId?: number): void {
+  openPhysicalOutput('program', displayId)
+}
+function closeNextOut(): void {
+  nextOutWindow?.close()
+}
+function openNextOut(displayId?: number): void {
+  openPhysicalOutput('next', displayId)
 }
 
 app.whenReady().then(() => {
@@ -466,14 +462,25 @@ app.whenReady().then(() => {
     programOutWindow?.webContents.send('program-out:laser-position', position)
   })
 
+  ipcMain.handle('next-out:list-displays', () => listDisplays())
+  ipcMain.handle('next-out:open', (_e, displayId?: number) => openNextOut(displayId))
+  ipcMain.handle('next-out:close', () => closeNextOut())
+  ipcMain.handle('next-out:is-open', () => nextOutWindow !== null)
+  ipcMain.handle('next-out:push-state', (_e, state: ProgramOutState) => {
+    latestNextOutState = state
+    nextOutWindow?.webContents.send('next-out:state', state)
+  })
+
   screen.on('display-added', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('program-out:displays-changed', listDisplays())
+      mainWindow.webContents.send('next-out:displays-changed', listDisplays())
     }
   })
   screen.on('display-removed', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('program-out:displays-changed', listDisplays())
+      mainWindow.webContents.send('next-out:displays-changed', listDisplays())
     }
   })
 

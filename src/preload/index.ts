@@ -228,6 +228,37 @@ const api = {
       }
     }
   },
+  nextOut: {
+    listDisplays: (): Promise<DisplayInfo[]> => ipcRenderer.invoke('next-out:list-displays'),
+    open: (displayId?: number): Promise<void> => ipcRenderer.invoke('next-out:open', displayId),
+    close: (): Promise<void> => ipcRenderer.invoke('next-out:close'),
+    isOpen: (): Promise<boolean> => ipcRenderer.invoke('next-out:is-open'),
+    pushState: (state: ProgramOutState): Promise<void> =>
+      ipcRenderer.invoke('next-out:push-state', state),
+    onOpenChanged: (callback: (open: boolean) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, open: boolean): void => callback(open)
+      ipcRenderer.on('next-out:open-changed', listener)
+      return (): void => {
+        ipcRenderer.removeListener('next-out:open-changed', listener)
+      }
+    },
+    onDisplaysChanged: (callback: (displays: DisplayInfo[]) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, displays: DisplayInfo[]): void =>
+        callback(displays)
+      ipcRenderer.on('next-out:displays-changed', listener)
+      return (): void => {
+        ipcRenderer.removeListener('next-out:displays-changed', listener)
+      }
+    },
+    onState: (callback: (state: ProgramOutState) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, state: ProgramOutState): void =>
+        callback(state)
+      ipcRenderer.on('next-out:state', listener)
+      return (): void => {
+        ipcRenderer.removeListener('next-out:state', listener)
+      }
+    }
+  },
   ndiOutput: {
     toggle: (streamId: string, name: string): Promise<boolean> =>
       ipcRenderer.invoke('ndi:toggle', streamId, name),
