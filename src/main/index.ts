@@ -486,6 +486,7 @@ app.whenReady().then(() => {
   ipcMain.handle('program-out:open', (_e, displayId?: number) => openProgramOut(displayId))
   ipcMain.handle('program-out:close', () => closeProgramOut())
   ipcMain.handle('program-out:is-open', () => programOutWindow !== null)
+  ipcMain.handle('program-out:get-state', () => latestProgramOutState)
   ipcMain.handle('program-out:push-state', (_e, state: ProgramOutState) => {
     latestProgramOutState = state
     programOutWindow?.webContents.send('program-out:state', state)
@@ -502,6 +503,7 @@ app.whenReady().then(() => {
   ipcMain.handle('next-out:open', (_e, displayId?: number) => openNextOut(displayId))
   ipcMain.handle('next-out:close', () => closeNextOut())
   ipcMain.handle('next-out:is-open', () => nextOutWindow !== null)
+  ipcMain.handle('next-out:get-state', () => latestNextOutState)
   ipcMain.handle('next-out:push-state', (_e, state: ProgramOutState) => {
     latestNextOutState = state
     nextOutWindow?.webContents.send('next-out:state', state)
