@@ -227,6 +227,7 @@ function openPhysicalOutput(kind: PhysicalOutput, displayId?: number): void {
   const displays = screen.getAllDisplays()
   const primary = screen.getPrimaryDisplay()
   const chosen = displayId === undefined ? undefined : displays.find((d) => d.id === displayId)
+  if (displayId !== undefined && !chosen) throw new Error('Wybrany monitor nie jest podłączony')
   const occupied = new Set(
     (['program', 'next', 'presenter'] as const)
       .filter((name) => name !== kind)
