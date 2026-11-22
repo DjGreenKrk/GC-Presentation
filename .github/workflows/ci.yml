@@ -13,7 +13,7 @@ name: ci
 # `npm run lint` is deliberately not a step: it already fails on main with
 # @typescript-eslint/explicit-function-return-type findings, and gating every
 # bump on a pre-existing red would block the PRs this workflow exists to
-# unblock. There is no `test` script to run.
+# unblock. Pure TypeScript transition rules are now covered by `npm test` using Node's built-in runner.
 on:
   push:
     branches: [main]
@@ -22,7 +22,12 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    name: Static checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -49,6 +54,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       # Covers main/preload and renderer/web separately — a bare tsc misses one.
+      - name: Unit tests (no NDI SDK needed)
+        run: npm test
+
       - name: Typecheck
         run: npm run typecheck
 
