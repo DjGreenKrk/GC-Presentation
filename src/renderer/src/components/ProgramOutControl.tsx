@@ -11,7 +11,7 @@ export interface DisplayInfo {
 
 interface Props {
   disabled: boolean
-  variant?: 'program' | 'next'
+  variant?: 'program' | 'next' | 'presenter'
   hideCursor: boolean
   onHideCursorChange: (value: boolean) => void
 }
@@ -26,10 +26,11 @@ function ProgramOutControl({
   hideCursor,
   onHideCursorChange
 }: Props): React.JSX.Element {
-  const output = variant === 'next' ? window.api.nextOut : window.api.programOut
+  const output = variant === 'next' ? window.api.nextOut : variant === 'presenter' ? window.api.presenterOut : window.api.programOut
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     output.listDisplays().then((list) => {
@@ -51,9 +52,14 @@ function ProgramOutControl({
     return output.onOpenChanged(setOpen)
   }, [output])
 
-  const toggle = (): void => {
-    if (open) output.close()
-    else if (selectedId !== null) output.open(selectedId)
+  const toggle = async (): Promise<void> => {
+    setError(null)
+    try {
+      if (open) await output.close()
+      else if (selectedId !== null) await output.open(selectedId)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się otworzyć wyjścia')
+    }
   }
 
   return (
@@ -74,11 +80,12 @@ function ProgramOutControl({
       )}
       <button
         className={`transport-btn ${open ? 'active' : ''}`}
-        disabled={disabled || (!open && selectedId === null)}
+        disabled={!open && (disabled || selectedId === null)}
         onClick={toggle}
       >
-        {variant === 'next' ? (open ? 'Close Next Out' : 'Next Out') : (open ? 'Close Program Out' : 'Program Out')}
+        {variant === 'next' ? (open ? 'Close Next Out' : 'Next Out') : variant === 'presenter' ? (open ? 'Close Presenter Out' : 'Presenter Out') : (open ? 'Close Program Out' : 'Program Out')}
       </button>
+      {error && <span role="alert" className="program-out-error" title={error}>{error}</span>}
       {variant === 'program' && <label className="program-out-hide-cursor">
         <input
           type="checkbox"
