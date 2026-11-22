@@ -6,4 +6,5 @@ out
 *.log*
 native/*/build
 native/*/vendor-sdk
+native/raw-input-helper/bin/
 dist-release/

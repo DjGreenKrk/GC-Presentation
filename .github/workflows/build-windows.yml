@@ -53,7 +53,9 @@ jobs:
         run: |
           Copy-Item "$env:NDI_SDK_DIR\Bin\x64\Processing.NDI.Lib.x64.dll" -Destination "native\ndi-send\build\Release\Processing.NDI.Lib.x64.dll"
 
-      - name: Build Windows installer
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Windows installer (includes Raw Input helper)
         run: npm run build:win
 
       - name: Upload build artifact
