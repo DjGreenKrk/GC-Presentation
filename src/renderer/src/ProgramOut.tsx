@@ -20,14 +20,33 @@ function ProgramOut({ mode = 'program' }: { mode?: 'program' | 'next' }): React.
 
   useEffect(() => {
     const api = mode === 'next' ? window.api.nextOut : window.api.programOut
-    return api.onState((next) => {
+    let disposed = false
+    let receivedPush = false
+    const apply = (next: ProgramOutState): void => {
+      if (disposed) return
       setState(next)
       if (next.kind === 'pdf' && next.data !== lastPdfDataRef.current) {
         lastPdfDataRef.current = next.data
         deckChangedRef.current = true
-        loadPdf(next.data).then(setDoc)
+        loadPdf(next.data).then((loaded) => {
+          if (!disposed && lastPdfDataRef.current === next.data) setDoc(loaded)
+          else void loaded.destroy()
+        }).catch((err) => console.error('Output PDF failed to load:', err))
       }
+    }
+    const unsubscribe = api.onState((next) => {
+      receivedPush = true
+      apply(next)
     })
+    // Electron's did-finish-load can race React's IPC subscription.
+    // Request a snapshot once subscribed; never overwrite a newer push.
+    api.getState().then((snapshot) => {
+      if (!receivedPush && snapshot) apply(snapshot)
+    }).catch((err) => console.error('Output state unavailable:', err))
+    return () => {
+      disposed = true
+      unsubscribe()
+    }
   }, [mode])
 
   useEffect(() => {
